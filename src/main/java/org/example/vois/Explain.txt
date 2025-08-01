@@ -40,37 +40,118 @@ JUnit 4: Monolithic. It was a single JAR file with all the core functionality. T
 JUnit 5: Modular. It is composed of three main modules:
 
     JUnit Platform: The foundation for launching testing frameworks on the JVM. It provides a TestEngine API for discovering and running tests.
+    TestEngine API (Low-Level, Core),This is not for test writers. It’s for people building their own testing frameworks. one of the implementation is Jupiter
 
     JUnit Jupiter: The programming model and extension API for writing tests in JUnit 5. It contains all the new annotations and features.
+    Extension API (High-Level, Pluggable), For regular test authors who want to add behaviors before/after tests, inject dependencies, etc.
+
 
     JUnit Vintage: An engine that allows you to run tests written with JUnit 3 and JUnit 4 on the JUnit 5 platform.
     This provides excellent backward compatibility and allows for a gradual migration.
 
-Feature 	            JUnit 4                                 JUnit 5
-Test method     	    @Test	                                @Test (no parameters)
-Before   	            @Before                                 @BeforeEach
-After                   @After	                                @AfterEach
-Before all      	    @BeforeClass	                        @BeforeAll
-After all 	            @AfterClass	                            @AfterAll
-Disabling a test        @Ignore  	                            @Disabled
-Grouping/tagging tests	@Category	                            @Tag
-Custom test runner	    @RunWith(BlockJUnit4ClassRunner)	    @ExtendWith(MockitoExtension.class)
-Rules	                @Rule, @ClassRule	                    Extension APIs,@ExtendWith
 
-** Runners In junit 4 **
+1. Test & Lifecycle Annotations
 
-Parameterized.class: To run a single test method with different data sets.
+    | Annotation                           | Purpose                                                                      |
+    | ------------------------------------ | ---------------------------------------------------------------------------- |
+    | `@Test`                              | Marks a test method (same name as JUnit 4 but part of JUnit 5 Jupiter)       |
+    | `@BeforeEach`                        | Runs **before each test method**                                             |
+    | `@AfterEach`                         | Runs **after each test method**                                              |
+    | `@BeforeAll`                         | Runs **once before all tests** (must be static unless using `@TestInstance`) |
+    | `@AfterAll`                          | Runs **once after all tests** (must be static unless using `@TestInstance`)  |
+    | `@TestInstance(Lifecycle.PER_CLASS)` | Allows non-static `@BeforeAll`/`@AfterAll`; controls test instance lifecycle |
+    | `@DisplayName("Custom name")`        | Gives a readable/test-friendly name for a test class or method               |
+    | `@Disabled`                          | Disables a test or test class with optional reason                           |
 
-MockitoJUnitRunner.class: To initialize mock objects automatically before each test. (what is difference between initialization and declarations)
 
-SpringJUnit4ClassRunner.class: To load a Spring application context for integration tests.
+2. Parameterized Testing Annotations
 
-Limitations: @RunWith approach is that you can only use one runner per test class. This makes it difficult to combine functionalities.
- For example, you couldn't use a parameterized runner and a Spring runner on the same class without some complex workarounds.
+    | Annotation                                           | Purpose                                                                      |
+    | ---------------------------------------------------- | ---------------------------------------------------------------------------- |
+    | `@ParameterizedTest`                                 | Runs the same test with different inputs                                     |
+    | `@ValueSource`                                       | Supplies literal values to a parameterized test (e.g., int\[], String\[])    |
+    | `@CsvSource`                                         | Supplies multiple parameters via inline CSV                                  |
+    | `@CsvFileSource`                                     | Reads test parameters from a CSV file                                        |
+    | `@MethodSource`                                      | Supplies parameters via a static method returning `Stream`, `Iterable`, etc. |
+    | `@EnumSource`                                        | Supplies each constant of an enum                                            |
+    | `@ArgumentsSource`                                   | Custom parameter provider                                                    |
+    | `@Arguments`                                         | Used with `@MethodSource` to pass multiple values                            |
+    | `@NullSource`, `@EmptySource`, `@NullAndEmptySource` | Provide `null` or empty values to parameterized tests                        |
 
+
+3. Tagging and Filtering
+    | Annotation     | Purpose                                                                                            |
+    | -------------- | -------------------------------------------------------------------------------------------------- |
+    | `@Tag("unit")` | Assigns a tag to a test or test class; useful for filtering (e.g., only run `@Tag("integration")`) |
+
+
+4. Dynamic & Programmatic Tests
+
+    | Annotation     | Purpose                                                                                  |
+    | -------------- | ---------------------------------------------------------------------------------------- |
+    | `@TestFactory` | Used for **dynamic tests** — returns a `Collection` or `Stream` of `DynamicTest` objects |
+
+5. Extensions (JUnit 5 Replacement for @RunWith)
+
+    | Annotation                         | Purpose                                                       |
+    | ---------------------------------- | ------------------------------------------------------------- |
+    | `@ExtendWith(SomeExtension.class)` | Registers a JUnit 5 **extension** (replaces `@RunWith`)       |
+    | `@RegisterExtension`               | Registers extensions programmatically (field-level or static) |
+
+6. Condition-based Execution (Conditional Tests)
+
+    | Annotation                                                        | Purpose                                     |
+    | ----------------------------------------------------------------- | ------------------------------------------- |
+    | `@EnabledIf`, `@DisabledIf`                                       | Conditional execution (from 3rd-party libs) |
+    | `@EnabledOnOs`, `@DisabledOnOs`                                   | Runs test only on specific OS               |
+    | `@EnabledOnJre`, `@DisabledOnJre`                                 | Runs test only on specific Java version     |
+    | `@EnabledIfEnvironmentVariable`, `@DisabledIfEnvironmentVariable` | Based on env vars                           |
+    | `@EnabledIfSystemProperty`, `@DisabledIfSystemProperty`           | Based on JVM system properties              |
+
+
+JUnit 4: @RunWith = one test runner
+    You must use @RunWith(SomeRunner.class)
+    You can only use one runner per test class
+
+    Limitation: You can't combine multiple runners directly.
+
+| Runner                    | Description                                                   |
+| ------------------------- | ------------------------------------------------------------- |
+| `BlockJUnit4ClassRunner`  | Default runner (if you don’t override)                        |
+| `Parameterized`           | Runs the same test multiple times with different parameters   |
+| `Suite`                   | Runs multiple test classes together                           |
+| `SpringJUnit4ClassRunner` | Provided by Spring to enable Spring TestContext Framework     |
+| `Theories`                | Experimental, runs tests with different data points           |
+| `Enclosed`                | Runs static inner test classes                                |
+| `MockitoJUnitRunner`      | Injects mocks via `@Mock`                                     |
+| `Categories`              | Group tests into categories to include/exclude certain groups |
+
+
+
+JUnit 5: @ExtendWith = extension system
+    You can use multiple extensions together like plugins
+    An Extension is like a plugin or helper.
+
+    Advantages: You can have many of them, and each does one specific job.
+
+| Extension                             | Interface                  | Description                       |
+| ------------------------------------- | -------------------------- | --------------------------------- |
+| `@ExtendWith(MockitoExtension.class)` | `ParameterResolver`, etc.  | Auto-inject mocks                 |
+| `SpringExtension`                     | `BeforeEachCallback`, etc. | Spring Boot testing support       |
+
+Common Extension Interface
+
+| Interface                                  | Purpose                                   |
+| ------------------------------------------ | ----------------------------------------- |
+| `BeforeAllCallback`, `AfterAllCallback`    | Hook into class-level setup/teardown      |
+| `BeforeEachCallback`, `AfterEachCallback`  | Hook into method-level setup/teardown     |
+| `TestExecutionExceptionHandler`            | Catch and customize exception handling    |
+| `ParameterResolver`                        | Inject values into test method parameters |
+| `TestInstancePostProcessor`                | Modify test instance after creation       |
+| `LifecycleMethodExecutionExceptionHandler` | Handle exceptions in lifecycle methods    |
+| `ExecutionCondition`                       | Enable/disable tests dynamically          |
 
 ** Annotations **
-
 
 1- @SpringBootTest
 Purpose: To load the entire Spring application context. This is an integration test annotation.
